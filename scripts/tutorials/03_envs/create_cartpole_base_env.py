@@ -75,6 +75,21 @@ class ObservationsCfg:
 
     # 观测组
     policy: PolicyCfg = PolicyCfg()
+    '''
+    变量名:  类型  = 值
+     ↑       ↑      ↑
+    name   type   value
+    
+    Isaac Lab 用了 @configclass（基于 dataclass 封装），
+    此时类型注解有了额外功能——dataclass 机制会读取类型注解来自动生成 __init__、__repr__ 等方法：
+    dataclass 靠这个注解知道：
+    #      1. "policy" 是一个字段
+    #      2. 字段类型是 PolicyCfg
+    #      3. 默认值是 PolicyCfg() 的实例
+    所以在这里，类型注解不仅仅是"提示"，它还是 dataclass 机制识别和构建配置结构的必要组成部分。
+    没有 : PolicyCfg 这个注解，dataclass 就不会把 policy 当作一个配置字段来处理。
+
+    '''
 
 
 @configclass

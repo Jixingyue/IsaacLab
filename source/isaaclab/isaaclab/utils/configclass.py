@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Sub-module that provides a wrapper around the Python 3.7 onwards ``dataclasses`` module."""
+"""子模块，提供对 Python 3.7+ ``dataclasses`` 模块的封装。"""
 
 import inspect
 import types
@@ -15,33 +15,31 @@ from typing import Any, ClassVar
 from .dict import class_to_dict, update_class_from_dict
 
 _CONFIGCLASS_METHODS = ["to_dict", "from_dict", "replace", "copy", "validate"]
-"""List of class methods added at runtime to dataclass."""
+"""在运行时添加到 dataclass 的类方法列表。"""
 
 """
-Wrapper around dataclass.
+dataclass 的封装。
 """
 
 
 def __dataclass_transform__():
-    """Add annotations decorator for PyLance."""
+    """为 PyLance 添加注解装饰器。"""
     return lambda a: a
 
 
 @__dataclass_transform__()
 def configclass(cls, **kwargs):
-    """Wrapper around `dataclass` functionality to add extra checks and utilities.
+    """对 `dataclass` 功能的封装，添加额外的检查和工具方法。
 
-    As of Python 3.7, the standard dataclasses have two main issues which makes them non-generic for
-    configuration use-cases. These include:
+    从 Python 3.7 开始，标准 dataclass 存在两个主要问题，使其无法通用于配置场景：
 
-    1. Requiring a type annotation for all its members.
-    2. Requiring explicit usage of :meth:`field(default_factory=...)` to reinitialize mutable variables.
+    1. 要求所有成员都必须有类型注解。
+    2. 要求显式使用 :meth:`field(default_factory=...)` 来重新初始化可变变量。
 
-    This function provides a decorator that wraps around Python's `dataclass`_ utility to deal with
-    the above two issues. It also provides additional helper functions for dictionary <-> class
-    conversion and easily copying class instances.
+    本函数提供了一个装饰器，封装了 Python 的 `dataclass`_ 工具来处理上述两个问题。
+    同时还提供了字典 <-> 类转换以及便捷复制类实例的辅助函数。
 
-    Usage:
+    用法：
 
     .. code-block:: python
 
@@ -52,7 +50,7 @@ def configclass(cls, **kwargs):
 
         @configclass
         class ViewerCfg:
-            eye: list = [7.5, 7.5, 7.5]  # field missing on purpose
+            eye: list = [7.5, 7.5, 7.5]  # 故意省略 field
             lookat: list = field(default_factory=[0.0, 0.0, 0.0])
 
 
@@ -63,89 +61,89 @@ def configclass(cls, **kwargs):
             viewer: ViewerCfg = ViewerCfg()
 
 
-        # create configuration instance
+        # 创建配置实例
         env_cfg = EnvCfg(num_envs=24)
 
-        # print information as a dictionary
+        # 以字典形式打印信息
         print(env_cfg.to_dict())
 
-        # create a copy of the configuration
+        # 创建配置的副本
         env_cfg_copy = env_cfg.copy()
 
-        # replace arbitrary fields using keyword arguments
+        # 使用关键字参数替换指定字段
         env_cfg_copy = env_cfg_copy.replace(num_envs=32)
 
     Args:
-        cls: The class to wrap around.
-        **kwargs: Additional arguments to pass to :func:`dataclass`.
+        cls: 要封装的类。
+        **kwargs: 传递给 :func:`dataclass` 的额外参数。
 
     Returns:
-        The wrapped class.
+        封装后的类。
 
     .. _dataclass: https://docs.python.org/3/library/dataclasses.html
     """
-    # add type annotations
+    # 添加类型注解
     _add_annotation_types(cls)
-    # add field factory
+    # 添加字段工厂
     _process_mutable_types(cls)
-    # copy mutable members
-    # note: we check if user defined __post_init__ function exists and augment it with our own
+    # 复制可变成员
+    # 注意：我们检查用户是否定义了 __post_init__ 函数，如果存在则将其与我们自己的函数组合
     if hasattr(cls, "__post_init__"):
         setattr(cls, "__post_init__", _combined_function(cls.__post_init__, _custom_post_init))
     else:
         setattr(cls, "__post_init__", _custom_post_init)
-    # add helper functions for dictionary conversion
+    # 添加字典转换的辅助函数
     setattr(cls, "to_dict", _class_to_dict)
     setattr(cls, "from_dict", _update_class_from_dict)
     setattr(cls, "replace", _replace_class_with_kwargs)
     setattr(cls, "copy", _copy_class)
     setattr(cls, "validate", _validate)
-    # wrap around dataclass
+    # 封装 dataclass
     cls = dataclass(cls, **kwargs)
-    # return wrapped class
+    # 返回封装后的类
     return cls
 
 
 """
-Dictionary <-> Class operations.
+字典 <-> 类操作。
 
-These are redefined here to add new docstrings.
+这里重新定义以添加新的文档字符串。
 """
 
 
 def _class_to_dict(obj: object) -> dict[str, Any]:
-    """Convert an object into dictionary recursively.
+    """递归地将对象转换为字典。
 
     Args:
-        obj: The object to convert.
+        obj: 要转换的对象。
 
     Returns:
-        Converted dictionary mapping.
+        转换后的字典映射。
     """
     return class_to_dict(obj)
 
 
 def _update_class_from_dict(obj, data: dict[str, Any]) -> None:
-    """Reads a dictionary and sets object variables recursively.
+    """读取字典并递归地设置对象变量。
 
-    This function performs in-place update of the class member attributes.
+    该函数对类成员属性执行原地更新。
 
     Args:
-        obj: The object to update.
-        data: Input (nested) dictionary to update from.
+        obj: 要更新的对象。
+        data: 用于更新的输入（嵌套）字典。
 
     Raises:
-        TypeError: When input is not a dictionary.
-        ValueError: When dictionary has a value that does not match default config type.
-        KeyError: When dictionary has a key that does not exist in the default config type.
+        TypeError: 当输入不是字典时。
+        ValueError: 当字典中的值与默认配置类型不匹配时。
+        KeyError: 当字典中的键在默认配置类型中不存在时。
     """
     update_class_from_dict(obj, data, _ns="")
 
 
 def _replace_class_with_kwargs(obj: object, **kwargs) -> object:
-    """Return a new object replacing specified fields with new values.
+    """返回一个新对象，将指定字段替换为新值。
 
-    This is especially useful for frozen classes.  Example usage:
+    这对于冻结类尤其有用。用法示例：
 
     .. code-block:: python
 
@@ -160,104 +158,103 @@ def _replace_class_with_kwargs(obj: object, **kwargs) -> object:
         assert c1.x == 3 and c1.y == 2
 
     Args:
-        obj: The object to replace.
-        **kwargs: The fields to replace and their new values.
+        obj: 要替换的对象。
+        **kwargs: 要替换的字段及其新值。
 
     Returns:
-        The new object.
+        新的对象。
     """
     return replace(obj, **kwargs)
 
 
 def _copy_class(obj: object) -> object:
-    """Return a new object with the same fields as the original."""
+    """返回一个与原始对象具有相同字段的新对象。"""
     return replace(obj)
 
 
 """
-Private helper functions.
+私有辅助函数。
 """
 
 
 def _add_annotation_types(cls):
-    """Add annotations to all elements in the dataclass.
+    """为 dataclass 中的所有元素添加注解。
 
-    By definition in Python, a field is defined as a class variable that has a type annotation.
+    在 Python 的定义中，字段被定义为具有类型注解的类变量。
 
-    In case type annotations are not provided, dataclass ignores those members when :func:`__dict__()` is called.
-    This function adds these annotations to the class variable to prevent any issues in case the user forgets to
-    specify the type annotation.
+    如果没有提供类型注解，dataclass 在调用 :func:`__dict__()` 时会忽略这些成员。
+    本函数为类变量添加这些注解，以防止用户忘记指定类型注解时出现任何问题。
 
-    This makes the following a feasible operation:
+    这使得以下操作成为可行：
 
     @dataclass
     class State:
         pos = (0.0, 0.0, 0.0)
            ^^
-           If the function is NOT used, the following type-error is returned:
+           如果不使用本函数，将返回以下类型错误：
            TypeError: 'pos' is a field but has no type annotation
     """
-    # get type hints
+    # 获取类型提示
     hints = {}
-    # iterate over class inheritance
-    # we add annotations from base classes first
+    # 遍历类继承链
+    # 我们首先添加基类的注解
     for base in reversed(cls.__mro__):
-        # check if base is object
+        # 检查基类是否为 object
         if base is object:
             continue
-        # get base class annotations
+        # 获取基类的注解
         ann = base.__dict__.get("__annotations__", {})
-        # directly add all annotations from base class
+        # 直接添加基类的所有注解
         hints.update(ann)
-        # iterate over base class members
-        # Note: Do not change this to dir(base) since it orders the members alphabetically.
-        #   This is not desirable since the order of the members is important in some cases.
+        # 遍历基类的成员
+        # 注意：不要将其改为 dir(base)，因为它会按字母顺序排列成员。
+        #   这是不可取的，因为成员的顺序在某些情况下很重要。
         for key in base.__dict__:
-            # get class member
+            # 获取类成员
             value = getattr(base, key)
-            # skip members
+            # 跳过成员
             if _skippable_class_member(key, value, hints):
                 continue
-            # add type annotations for members that don't have explicit type annotations
-            # for these, we deduce the type from the default value
+            # 为没有显式类型注解的成员添加类型注解
+            # 对于这些成员，我们从默认值推导类型
             if not isinstance(value, type):
                 if key not in hints:
-                    # check if var type is not MISSING
-                    # we cannot deduce type from MISSING!
+                    # 检查变量类型是否不是 MISSING
+                    # 我们无法从 MISSING 推导类型！
                     if value is MISSING:
                         raise TypeError(
                             f"Missing type annotation for '{key}' in class '{cls.__name__}'."
                             " Please add a type annotation or set a default value."
                         )
-                    # add type annotation
+                    # 添加类型注解
                     hints[key] = type(value)
             elif key != value.__name__:
-                # note: we don't want to add type annotations for nested configclass. Thus, we check if
-                #   the name of the type matches the name of the variable.
-                # since Python 3.10, type hints are stored as strings
+                # 注意：我们不想为嵌套的 configclass 添加类型注解。因此，我们检查
+                #   类型的名称是否与变量的名称匹配。
+                # 从 Python 3.10 开始，类型提示以字符串形式存储
                 hints[key] = f"type[{value.__name__}]"
 
-    # Note: Do not change this line. `cls.__dict__.get("__annotations__", {})` is different from
-    #   `cls.__annotations__` because of inheritance.
+    # 注意：不要更改这一行。由于继承的原因，`cls.__dict__.get("__annotations__", {})` 与
+    #   `cls.__annotations__` 不同。
     cls.__annotations__ = cls.__dict__.get("__annotations__", {})
     cls.__annotations__ = hints
 
 
 def _validate(obj: object, prefix: str = "") -> list[str]:
-    """Check the validity of configclass object.
+    """检查 configclass 对象的有效性。
 
-    This function checks if the object is a valid configclass object. A valid configclass object contains no MISSING
-    entries.
+    该函数检查对象是否为有效的 configclass 对象。有效的 configclass 对象不包含 MISSING
+    条目。
 
     Args:
-        obj: The object to check.
-        prefix: The prefix to add to the missing fields. Defaults to ''.
+        obj: 要检查的对象。
+        prefix: 添加到缺失字段的前缀。默认为 ''。
 
     Returns:
-        A list of missing fields.
+        缺失字段的列表。
 
     Raises:
-        TypeError: When the object is not a valid configuration object.
+        TypeError: 当对象不是有效的配置对象时。
     """
     missing_fields = []
 
@@ -273,7 +270,7 @@ def _validate(obj: object, prefix: str = "") -> list[str]:
             missing_fields.extend(_validate(item, prefix=current_path))
         return missing_fields
     elif isinstance(obj, dict):
-        # Convert any non-string keys to strings to allow validation of dict with non-string keys
+        # 将任何非字符串键转换为字符串，以允许对具有非字符串键的字典进行验证
         if any(not isinstance(key, str) for key in obj.keys()):
             obj_dict = {str(key): value for key, value in obj.items()}
         else:
@@ -284,13 +281,13 @@ def _validate(obj: object, prefix: str = "") -> list[str]:
         return missing_fields
 
     for key, value in obj_dict.items():
-        # disregard builtin attributes
+        # 忽略内置属性
         if key.startswith("__"):
             continue
         current_path = f"{prefix}.{key}" if prefix else key
         missing_fields.extend(_validate(value, prefix=current_path))
 
-    # raise an error only once at the top-level call
+    # 仅在顶层调用时抛出错误
     if prefix == "" and missing_fields:
         formatted_message = "\n".join(f"  - {field}" for field in missing_fields)
         raise TypeError(
@@ -301,120 +298,119 @@ def _validate(obj: object, prefix: str = "") -> list[str]:
 
 
 def _process_mutable_types(cls):
-    """Initialize all mutable elements through :obj:`dataclasses.Field` to avoid unnecessary complaints.
+    """通过 :obj:`dataclasses.Field` 初始化所有可变元素，以避免不必要的报错。
 
-    By default, dataclass requires usage of :obj:`field(default_factory=...)` to reinitialize mutable objects
-    every time a new class instance is created. If a member has a mutable type and it is created without
-    specifying the `field(default_factory=...)`, then Python throws an error requiring the usage of `default_factory`.
+    默认情况下，dataclass 要求使用 :obj:`field(default_factory=...)` 来在每次创建新的类实例时
+    重新初始化可变对象。如果成员具有可变类型且创建时未指定 `field(default_factory=...)`，
+    则 Python 会抛出错误，要求使用 `default_factory`。
 
-    Additionally, Python only explicitly checks for field specification when the type is a list, set or dict.
-    This misses the use-case where the type is class itself. Thus, the code silently carries a bug with it which
-    can lead to undesirable effects.
+    此外，Python 仅在类型为 list、set 或 dict 时显式检查字段规范。
+    这遗漏了类型本身就是类的情况。因此，代码会悄悄携带一个可能导致不良效果的 bug。
 
-    This function deals with this issue
+    本函数处理了这个问题
 
-    This makes the following a feasible operation:
+    这使得以下操作成为可行：
 
     @dataclass
     class State:
         pos: list = [0.0, 0.0, 0.0]
            ^^
-           If the function is NOT used, the following value-error is returned:
+           如果不使用本函数，将返回以下值错误：
            ValueError: mutable default <class 'list'> for field pos is not allowed: use default_factory
     """
-    # note: Need to set this up in the same order as annotations. Otherwise, it
-    #   complains about missing positional arguments.
+    # 注意：需要按照与注解相同的顺序设置。否则，
+    #   会报缺少位置参数的错误。
     ann = cls.__dict__.get("__annotations__", {})
 
-    # iterate over all class members and store them in a dictionary
+    # 遍历所有类成员并存储在字典中
     class_members = {}
     for base in reversed(cls.__mro__):
-        # check if base is object
+        # 检查基类是否为 object
         if base is object:
             continue
-        # iterate over base class members
+        # 遍历基类的成员
         for key in base.__dict__:
-            # get class member
+            # 获取类成员
             f = getattr(base, key)
-            # skip members
+            # 跳过成员
             if _skippable_class_member(key, f):
                 continue
-            # store class member if it is not a type or if it is already present in annotations
+            # 存储类成员（如果它不是类型或已存在于注解中）
             if not isinstance(f, type) or key in ann:
                 class_members[key] = f
-        # iterate over base class data fields
-        # in previous call, things that became a dataclass field were removed from class members
-        # so we need to add them back here as a dataclass field directly
+        # 遍历基类的数据字段
+        # 在上一次调用中，成为 dataclass 字段的内容已从类成员中移除
+        # 因此我们需要在这里直接将它们作为 dataclass 字段添加回来
         for key, f in base.__dict__.get("__dataclass_fields__", {}).items():
-            # store class member
+            # 存储类成员
             if not isinstance(f, type):
                 class_members[key] = f
 
-    # check that all annotations are present in class members
-    # note: mainly for debugging purposes
+    # 检查所有注解是否存在于类成员中
+    # 注意：主要用于调试目的
     if len(class_members) != len(ann):
         raise ValueError(
             f"In class '{cls.__name__}', number of annotations ({len(ann)}) does not match number of class members"
             f" ({len(class_members)}). Please check that all class members have type annotations and/or a default"
             " value. If you don't want to specify a default value, please use the literal `dataclasses.MISSING`."
         )
-    # iterate over annotations and add field factory for mutable types
+    # 遍历注解并为可变类型添加字段工厂
     for key in ann:
-        # find matching field in class
+        # 在类中查找匹配的字段
         value = class_members.get(key, MISSING)
-        # check if key belongs to ClassVar
-        # in that case, we cannot use default_factory!
+        # 检查键是否属于 ClassVar
+        # 在这种情况下，我们不能使用 default_factory！
         origin = getattr(ann[key], "__origin__", None)
         if origin is ClassVar:
             continue
-        # check if f is MISSING
-        # note: commented out for now since it causes issue with inheritance
-        #   of dataclasses when parent have some positional and some keyword arguments.
-        # Ref: https://stackoverflow.com/questions/51575931/class-inheritance-in-python-3-7-dataclasses
-        # TODO: check if this is fixed in Python 3.10
+        # 检查 f 是否为 MISSING
+        # 注意：暂时注释掉，因为它会导致 dataclass 继承问题
+        #   当父类同时具有位置参数和关键字参数时。
+        # 参考：https://stackoverflow.com/questions/51575931/class-inheritance-in-python-3-7-dataclasses
+        # TODO: 检查这是否在 Python 3.10 中已修复
         # if f is MISSING:
         #     continue
         if isinstance(value, Field):
             setattr(cls, key, value)
         elif not isinstance(value, type):
-            # create field factory for mutable types
+            # 为可变类型创建字段工厂
             value = field(default_factory=_return_f(value))
             setattr(cls, key, value)
 
 
 def _custom_post_init(obj):
-    """Deepcopy all elements to avoid shared memory issues for mutable objects in dataclasses initialization.
+    """深拷贝所有元素，以避免 dataclass 初始化时可变对象的共享内存问题。
 
-    This function is called explicitly instead of as a part of :func:`_process_mutable_types()` to prevent mapping
-    proxy type i.e. a read only proxy for mapping objects. The error is thrown when using hierarchical data-classes
-    for configuration.
+    该函数被显式调用，而不是作为 :func:`_process_mutable_types()` 的一部分，
+    以防止映射代理类型（即映射对象的只读代理）的错误。该错误在使用分层数据类
+    进行配置时抛出。
     """
     for key in dir(obj):
-        # skip dunder members
+        # 跳过双下划线成员
         if key.startswith("__"):
             continue
-        # get data member
+        # 获取数据成员
         value = getattr(obj, key)
-        # check annotation
+        # 检查注解
         ann = obj.__class__.__dict__.get(key)
-        # duplicate data members that are mutable
+        # 复制可变的类成员
         if not callable(value) and not isinstance(ann, property):
             setattr(obj, key, deepcopy(value))
 
 
 def _combined_function(f1: Callable, f2: Callable) -> Callable:
-    """Combine two functions into one.
+    """将两个函数组合为一个。
 
     Args:
-        f1: The first function.
-        f2: The second function.
+        f1: 第一个函数。
+        f2: 第二个函数。
 
     Returns:
-        The combined function.
+        组合后的函数。
     """
 
     def _combined(*args, **kwargs):
-        # call both functions
+        # 调用两个函数
         f1(*args, **kwargs)
         f2(*args, **kwargs)
 
@@ -422,67 +418,66 @@ def _combined_function(f1: Callable, f2: Callable) -> Callable:
 
 
 """
-Helper functions
+辅助函数
 """
 
 
 def _skippable_class_member(key: str, value: Any, hints: dict | None = None) -> bool:
-    """Check if the class member should be skipped in configclass processing.
+    """检查在 configclass 处理中是否应跳过该类成员。
 
-    The following members are skipped:
+    以下成员会被跳过：
 
-    * Dunder members: ``__name__``, ``__module__``, ``__qualname__``, ``__annotations__``, ``__dict__``.
-    * Manually-added special class functions: From :obj:`_CONFIGCLASS_METHODS`.
-    * Members that are already present in the type annotations.
-    * Functions bounded to class object or class.
-    * Properties bounded to class object.
+    * 双下划线成员：``__name__``、``__module__``、``__qualname__``、``__annotations__``、``__dict__``。
+    * 手动添加的特殊类函数：来自 :obj:`_CONFIGCLASS_METHODS`。
+    * 已存在于类型注解中的成员。
+    * 绑定到类对象或类的函数。
+    * 绑定到类对象的属性。
 
     Args:
-        key: The class member name.
-        value: The class member value.
-        hints: The type hints for the class. Defaults to None, in which case, the
-            members existence in type hints are not checked.
+        key: 类成员名称。
+        value: 类成员值。
+        hints: 类的类型提示。默认为 None，此时不检查成员是否存在于类型提示中。
 
     Returns:
-        True if the class member should be skipped, False otherwise.
+        如果应跳过该类成员则返回 True，否则返回 False。
     """
-    # skip dunder members
+    # 跳过双下划线成员
     if key.startswith("__"):
         return True
-    # skip manually-added special class functions
+    # 跳过手动添加的特殊类函数
     if key in _CONFIGCLASS_METHODS:
         return True
-    # check if key is already present
+    # 检查键是否已存在
     if hints is not None and key in hints:
         return True
-    # skip functions bounded to class
+    # 跳过绑定到类的函数
     if callable(value):
-        # FIXME: This doesn't yet work for static methods because they are essentially seen as function types.
-        # check for class methods
+        # FIXME: 这还不能用于静态方法，因为它们本质上被视为函数类型。
+        # 检查类方法
         if isinstance(value, types.MethodType):
             return True
 
         if "CollisionAPI" in value.__name__:
             return False
 
-        # check for instance methods
+        # 检查实例方法
         signature = inspect.signature(value)
         if "self" in signature.parameters or "cls" in signature.parameters:
             return True
 
-    # skip property methods
+    # 跳过属性方法
     if isinstance(value, property):
         return True
-    # Otherwise, don't skip
+    # 否则，不跳过
     return False
 
 
 def _return_f(f: Any) -> Callable[[], Any]:
-    """Returns default factory function for creating mutable/immutable variables.
+    """返回用于创建可变/不可变变量的默认工厂函数。
 
-    This function should be used to create default factory functions for variables.
+    该函数应用于为变量创建默认工厂函数。
 
-    Example:
+    示例：
 
         .. code-block:: python
 
