@@ -84,7 +84,7 @@ class MySceneCfg(InteractiveSceneCfg):
 
     # 添加地形
     terrain = TerrainImporterCfg(
-        prim_path="/World/ground",
+        prim_path="/World/ground", # 绝对路径
         terrain_type="generator",
         terrain_generator=ROUGH_TERRAINS_CFG,
         max_init_terrain_level=5,
@@ -99,11 +99,11 @@ class MySceneCfg(InteractiveSceneCfg):
     )
 
     # 添加机器人
-    robot: ArticulationCfg = ANYMAL_C_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = ANYMAL_C_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot") # ENV_REGEX_NS 相对路径：在已建立的环境中构建机器人
 
     # 传感器
     height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base",
+        prim_path="{ENV_REGEX_NS}/Robot/base", # 传感器的相对路径
         offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
         ray_alignment="yaw",
         pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
@@ -113,7 +113,7 @@ class MySceneCfg(InteractiveSceneCfg):
 
     # 光照
     light = AssetBaseCfg(
-        prim_path="/World/light",
+        prim_path="/World/light", # 绝对路径
         spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
 
