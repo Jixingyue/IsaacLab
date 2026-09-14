@@ -19,13 +19,13 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# create argparser
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Tutorial on creating an empty stage.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -37,25 +37,25 @@ from isaaclab.sim import SimulationCfg, SimulationContext
 def main():
     """Main function."""
 
-    # Initialize the simulation context
+    # 初始化仿真上下文
     sim_cfg = SimulationCfg(dt=0.01)
     sim = SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
 
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
 
-    # Simulate physics
+    # 运行物理仿真
     while simulation_app.is_running():
-        # perform step
+        # 执行一步仿真
         sim.step()
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

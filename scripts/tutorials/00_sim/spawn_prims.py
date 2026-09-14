@@ -19,13 +19,13 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# create argparser
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Tutorial on spawning prims into the scene.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -37,20 +37,20 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 def design_scene():
     """Designs the scene by spawning ground plane, light, objects and meshes from usd files."""
-    # Ground-plane
+    # 地面平面
     cfg_ground = sim_utils.GroundPlaneCfg()
     cfg_ground.func("/World/defaultGroundPlane", cfg_ground)
 
-    # spawn distant light
+    # 生成远光源
     cfg_light_distant = sim_utils.DistantLightCfg(
         intensity=3000.0,
         color=(0.75, 0.75, 0.75),
     )
     cfg_light_distant.func("/World/lightDistant", cfg_light_distant, translation=(1, 0, 10))
 
-    # create a new xform prim for all objects to be spawned under
+    # 创建新的 Xform Prim 作为所有待生成对象的父节点
     sim_utils.create_prim("/World/Objects", "Xform")
-    # spawn a red cone
+    # 生成一个红色圆锥
     cfg_cone = sim_utils.ConeCfg(
         radius=0.15,
         height=0.5,
@@ -59,7 +59,7 @@ def design_scene():
     cfg_cone.func("/World/Objects/Cone1", cfg_cone, translation=(-1.0, 1.0, 1.0))
     cfg_cone.func("/World/Objects/Cone2", cfg_cone, translation=(-1.0, -1.0, 1.0))
 
-    # spawn a green cone with colliders and rigid body
+    # 生成带碰撞体和刚体属性的绿色圆锥
     cfg_cone_rigid = sim_utils.ConeCfg(
         radius=0.15,
         height=0.5,
@@ -72,7 +72,7 @@ def design_scene():
         "/World/Objects/ConeRigid", cfg_cone_rigid, translation=(-0.2, 0.0, 2.0), orientation=(0.5, 0.0, 0.5, 0.0)
     )
 
-    # spawn a blue cuboid with deformable body
+    # 生成带可变形体属性的蓝色长方体
     cfg_cuboid_deformable = sim_utils.MeshCuboidCfg(
         size=(0.2, 0.5, 0.2),
         deformable_props=sim_utils.DeformableBodyPropertiesCfg(),
@@ -81,7 +81,7 @@ def design_scene():
     )
     cfg_cuboid_deformable.func("/World/Objects/CuboidDeformable", cfg_cuboid_deformable, translation=(0.15, 0.0, 2.0))
 
-    # spawn a usd file of a table into the scene
+    # 将桌子的 USD 文件生成到场景中
     cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd")
     cfg.func("/World/Objects/Table", cfg, translation=(0.0, 0.0, 1.05))
 
@@ -89,26 +89,26 @@ def design_scene():
 def main():
     """Main function."""
 
-    # Initialize the simulation context
+    # 初始化仿真上下文
     sim_cfg = sim_utils.SimulationCfg(dt=0.01, device=args_cli.device)
     sim = sim_utils.SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([2.0, 0.0, 2.5], [-0.5, 0.0, 0.5])
-    # Design scene
+    # 构建场景
     design_scene()
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
 
-    # Simulate physics
+    # 运行物理仿真
     while simulation_app.is_running():
-        # perform step
+        # 执行一步仿真
         sim.step()
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

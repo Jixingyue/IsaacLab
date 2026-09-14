@@ -25,7 +25,7 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="This script demonstrates how to use the camera sensor.")
 parser.add_argument(
     "--draw",
@@ -49,12 +49,12 @@ parser.add_argument(
         " The viewport will always initialize with the perspective of camera 0."
     ),
 )
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -79,9 +79,9 @@ from isaaclab.utils import convert_dict_to_backend
 
 def define_sensor() -> Camera:
     """Defines the camera sensor to add to the scene."""
-    # Setup camera sensor
-    # In contrast to the ray-cast camera, we spawn the prim at these locations.
-    # This means the camera sensor will be attached to these prims.
+    # 设置相机传感器
+    # 与射线投射相机不同，我们在这些位置生成 prim。
+    # 这意味着相机传感器将被附加到这些 prim 上。
     sim_utils.create_prim("/World/Origin_00", "Xform")
     sim_utils.create_prim("/World/Origin_01", "Xform")
     camera_cfg = CameraCfg(
@@ -104,7 +104,7 @@ def define_sensor() -> Camera:
             focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
         ),
     )
-    # Create camera
+    # 创建相机
     camera = Camera(cfg=camera_cfg)
 
     return camera
@@ -112,27 +112,27 @@ def define_sensor() -> Camera:
 
 def design_scene() -> dict:
     """Design the scene."""
-    # Populate scene
-    # -- Ground-plane
+    # 构建场景
+    # -- 地面平面
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
-    # -- Lights
+    # -- 光照
     cfg = sim_utils.DistantLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     cfg.func("/World/Light", cfg)
 
-    # Create a dictionary for the scene entities
+    # 创建场景实体的字典
     scene_entities = {}
 
-    # Xform to hold objects
+    # 用于承载物体的 Xform
     sim_utils.create_prim("/World/Objects", "Xform")
-    # Random objects
+    # 随机物体
     for i in range(8):
-        # sample random position
+        # 采样随机位置
         position = np.random.rand(3) - np.asarray([0.05, 0.05, -1.0])
         position *= np.asarray([1.5, 1.5, 0.5])
-        # sample random color
+        # 采样随机颜色
         color = (random.random(), random.random(), random.random())
-        # choose random prim type
+        # 选择随机 prim 类型
         prim_type = random.choice(["Cube", "Cone", "Cylinder"])
         common_properties = {
             "rigid_props": sim_utils.RigidBodyPropertiesCfg(),
@@ -147,7 +147,7 @@ def design_scene() -> dict:
             shape_cfg = sim_utils.ConeCfg(radius=0.1, height=0.25, **common_properties)
         elif prim_type == "Cylinder":
             shape_cfg = sim_utils.CylinderCfg(radius=0.25, height=0.25, **common_properties)
-        # Rigid Object
+        # 刚体物体
         obj_cfg = RigidObjectCfg(
             prim_path=f"/World/Objects/Obj_{i:02d}",
             spawn=shape_cfg,
@@ -155,20 +155,20 @@ def design_scene() -> dict:
         )
         scene_entities[f"rigid_object{i}"] = RigidObject(cfg=obj_cfg)
 
-    # Sensors
+    # 传感器
     camera = define_sensor()
 
-    # return the scene information
+    # 返回场景信息
     scene_entities["camera"] = camera
     return scene_entities
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
     """Run the simulator."""
-    # extract entities for simplified notation
+    # 提取实体以简化表示
     camera: Camera = scene_entities["camera"]
 
-    # Create replicator writer
+    # 创建 replicator 写入器
     output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "output", "camera")
     rep_writer = rep.BasicWriter(
         output_dir=output_dir,
@@ -178,37 +178,37 @@ def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
         colorize_semantic_segmentation=camera.cfg.colorize_semantic_segmentation,
     )
 
-    # Camera positions, targets, orientations
+    # 相机位置、目标、朝向
     camera_positions = torch.tensor([[2.5, 2.5, 2.5], [-2.5, -2.5, 2.5]], device=sim.device)
     camera_targets = torch.tensor([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], device=sim.device)
-    # These orientations are in ROS-convention, and will position the cameras to view the origin
+    # 这些朝向使用 ROS 约定，将使相机朝向原点观察
     camera_orientations = torch.tensor(  # noqa: F841
         [[-0.1759, 0.3399, 0.8205, -0.4247], [-0.4247, 0.8205, -0.3399, 0.1759]], device=sim.device
     )
 
-    # Set pose: There are two ways to set the pose of the camera.
-    # -- Option-1: Set pose using view
+    # 设置位姿：有两种方式设置相机的位姿。
+    # -- 方式一：使用 view 设置位姿
     camera.set_world_poses_from_view(camera_positions, camera_targets)
-    # -- Option-2: Set pose using ROS
+    # -- 方式二：使用 ROS 设置位姿
     # camera.set_world_poses(camera_positions, camera_orientations, convention="ros")
 
-    # Index of the camera to use for visualization and saving
+    # 用于可视化和保存的相机索引
     camera_index = args_cli.camera_id
 
-    # Create the markers for the --draw option outside of is_running() loop
+    # 在 is_running() 循环外创建 --draw 选项的标记
     if sim.has_gui() and args_cli.draw:
         cfg = RAY_CASTER_MARKER_CFG.replace(prim_path="/Visuals/CameraPointCloud")
         cfg.markers["hit"].radius = 0.002
         pc_markers = VisualizationMarkers(cfg)
 
-    # Simulate physics
+    # 仿真物理
     while simulation_app.is_running():
-        # Step simulation
+        # 执行一步仿真
         sim.step()
-        # Update camera data
+        # 更新相机数据
         camera.update(dt=sim.get_physics_dt())
 
-        # Print camera info
+        # 打印相机信息
         print(camera)
         if "rgb" in camera.data.output.keys():
             print("Received shape of rgb image        : ", camera.data.output["rgb"].shape)
@@ -224,32 +224,32 @@ def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
             print("Received shape of instance id segm.: ", camera.data.output["instance_id_segmentation_fast"].shape)
         print("-------------------------------")
 
-        # Extract camera data
+        # 提取相机数据
         if args_cli.save:
-            # Save images from camera at camera_index
-            # note: BasicWriter only supports saving data in numpy format, so we need to convert the data to numpy.
+            # 保存 camera_index 处相机的图像
+            # 注意：BasicWriter 仅支持以 numpy 格式保存数据，因此我们需要将数据转换为 numpy。
             single_cam_data = convert_dict_to_backend(
                 {k: v[camera_index] for k, v in camera.data.output.items()}, backend="numpy"
             )
 
-            # Extract the other information
+            # 提取其他信息
             single_cam_info = camera.data.info[camera_index]
 
-            # Pack data back into replicator format to save them using its writer
+            # 将数据重新打包为 replicator 格式以使用其写入器保存
             rep_output = {"annotators": {}}
             for key, data, info in zip(single_cam_data.keys(), single_cam_data.values(), single_cam_info.values()):
                 if info is not None:
                     rep_output["annotators"][key] = {"render_product": {"data": data, **info}}
                 else:
                     rep_output["annotators"][key] = {"render_product": {"data": data}}
-            # Save images
-            # Note: We need to provide On-time data for Replicator to save the images.
+            # 保存图像
+            # 注意：我们需要为 Replicator 提供 On-time 数据以保存图像。
             rep_output["trigger_outputs"] = {"on_time": camera.frame[camera_index]}
             rep_writer.write(rep_output)
 
-        # Draw pointcloud if there is a GUI and --draw has been passed
+        # 如果有 GUI 且传入了 --draw 参数，则绘制点云
         if sim.has_gui() and args_cli.draw and "distance_to_image_plane" in camera.data.output.keys():
-            # Derive pointcloud from camera at camera_index
+            # 从 camera_index 处的相机推导点云
             pointcloud = create_pointcloud_from_depth(
                 intrinsic_matrix=camera.data.intrinsic_matrices[camera_index],
                 depth=camera.data.output["distance_to_image_plane"][camera_index],
@@ -258,32 +258,32 @@ def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
                 device=sim.device,
             )
 
-            # In the first few steps, things are still being instanced and Camera.data
-            # can be empty. If we attempt to visualize an empty pointcloud it will crash
-            # the sim, so we check that the pointcloud is not empty.
+            # 在前几步中，物体仍在实例化，Camera.data 可能为空。
+            # 如果我们尝试可视化空点云，会导致仿真崩溃，
+            # 因此我们需要检查点云是否为空。
             if pointcloud.size()[0] > 0:
                 pc_markers.visualize(translations=pointcloud)
 
 
 def main():
     """Main function."""
-    # Load simulation context
+    # 加载仿真上下文
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = sim_utils.SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
-    # Design scene
+    # 构建场景
     scene_entities = design_scene()
-    # Play simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run simulator
+    # 运行模拟器
     run_simulator(sim, scene_entities)
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

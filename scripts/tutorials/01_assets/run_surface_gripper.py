@@ -20,14 +20,14 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 添加 argparse 参数
 parser = argparse.ArgumentParser(description="Tutorial on spawning and interacting with a Surface Gripper.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -40,47 +40,47 @@ from isaaclab.assets import Articulation, SurfaceGripper, SurfaceGripperCfg
 from isaaclab.sim import SimulationContext
 
 ##
-# Pre-defined configs
+# 预定义配置
 ##
 from isaaclab_assets import PICK_AND_PLACE_CFG  # isort:skip
 
 
 def design_scene():
     """Designs the scene."""
-    # Ground-plane
+    # 地面平面
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
-    # Lights
+    # 光照
     cfg = sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     cfg.func("/World/Light", cfg)
 
-    # Create separate groups called "Origin1", "Origin2"
-    # Each group will have a robot in it
+    # 创建名为 "Origin1"、"Origin2" 的独立分组
+    # 每个分组中都会放置一个机器人
     origins = [[2.75, 0.0, 0.0], [-2.75, 0.0, 0.0]]
-    # Origin 1
+    # 原点 1
     sim_utils.create_prim("/World/Origin1", "Xform", translation=origins[0])
-    # Origin 2
+    # 原点 2
     sim_utils.create_prim("/World/Origin2", "Xform", translation=origins[1])
 
-    # Articulation: First we define the robot config
+    # 关节系统：先定义机器人配置
     pick_and_place_robot_cfg = PICK_AND_PLACE_CFG.copy()
     pick_and_place_robot_cfg.prim_path = "/World/Origin.*/Robot"
     pick_and_place_robot = Articulation(cfg=pick_and_place_robot_cfg)
 
-    # Surface Gripper: Next we define the surface gripper config
+    # 表面夹爪：接着定义表面夹爪配置
     surface_gripper_cfg = SurfaceGripperCfg()
-    # We need to tell the View which prim to use for the surface gripper
+    # 需要告诉视图表面夹爪使用哪个 prim
     surface_gripper_cfg.prim_path = "/World/Origin.*/Robot/picker_head/SurfaceGripper"
-    # We can then set different parameters for the surface gripper, note that if these parameters are not set,
-    # the View will try to read them from the prim.
-    surface_gripper_cfg.max_grip_distance = 0.1  # [m] (Maximum distance at which the gripper can grasp an object)
-    surface_gripper_cfg.shear_force_limit = 500.0  # [N] (Force limit in the direction perpendicular direction)
-    surface_gripper_cfg.coaxial_force_limit = 500.0  # [N] (Force limit in the direction of the gripper's axis)
-    surface_gripper_cfg.retry_interval = 0.1  # seconds (Time the gripper will stay in a grasping state)
-    # We can now spawn the surface gripper
+    # 接着可以为表面夹爪设置不同参数，注意如果这些参数未设置
+    # 视图会尝试从该 prim 中读取它们
+    surface_gripper_cfg.max_grip_distance = 0.1  # [m] 夹爪能够抓取物体的最大距离
+    surface_gripper_cfg.shear_force_limit = 500.0  # [N] 垂直方向上的力限制
+    surface_gripper_cfg.coaxial_force_limit = 500.0  # [N] 沿夹爪轴线方向的力限制
+    surface_gripper_cfg.retry_interval = 0.1  # [s] 夹爪保持抓取状态的时间
+    # 现在可以生成表面夹爪
     surface_gripper = SurfaceGripper(cfg=surface_gripper_cfg)
 
-    # return the scene information
+    # 返回场景信息
     scene_entities = {"pick_and_place_robot": pick_and_place_robot, "surface_gripper": surface_gripper}
     return scene_entities, origins
 
@@ -89,66 +89,66 @@ def run_simulator(
     sim: sim_utils.SimulationContext, entities: dict[str, Articulation | SurfaceGripper], origins: torch.Tensor
 ):
     """Runs the simulation loop."""
-    # Extract scene entities
+    # 提取场景实体
     robot: Articulation = entities["pick_and_place_robot"]
     surface_gripper: SurfaceGripper = entities["surface_gripper"]
 
-    # Define simulation stepping
+    # 定义仿真步进参数
     sim_dt = sim.get_physics_dt()
     count = 0
-    # Simulation loop
+    # 仿真循环
     while simulation_app.is_running():
-        # Reset
+        # 重置
         if count % 500 == 0:
-            # reset counter
+            # 重置计数器
             count = 0
-            # reset the scene entities
-            # root state
-            # we offset the root state by the origin since the states are written in simulation world frame
-            # if this is not done, then the robots will be spawned at the (0, 0, 0) of the simulation world
+            # 重置场景实体
+            # 根状态
+            # 由于状态是以仿真世界坐标系写入的，因此我们要按原点对根状态进行偏移
+            # 否则机器人会生成在仿真世界的 (0, 0, 0) 位置
             root_state = robot.data.default_root_state.clone()
             root_state[:, :3] += origins
             robot.write_root_pose_to_sim(root_state[:, :7])
             robot.write_root_velocity_to_sim(root_state[:, 7:])
-            # set joint positions with some noise
+            # 为关节位置添加一些噪声
             joint_pos, joint_vel = robot.data.default_joint_pos.clone(), robot.data.default_joint_vel.clone()
             joint_pos += torch.rand_like(joint_pos) * 0.1
             robot.write_joint_state_to_sim(joint_pos, joint_vel)
-            # clear internal buffers
+            # 清空内部缓冲区
             robot.reset()
             print("[INFO]: Resetting robot state...")
-            # Opens the gripper and makes sure the gripper is in the open state
+            # 打开夹爪并确保夹爪处于张开状态
             surface_gripper.reset()
             print("[INFO]: Resetting gripper state...")
 
-        # Sample a random command between -1 and 1.
+        # 在 -1 到 1 之间采样随机指令
         gripper_commands = torch.rand(surface_gripper.num_instances) * 2.0 - 1.0
-        # The gripper behavior is as follows:
-        # -1 < command < -0.3 --> Gripper is Opening
-        # -0.3 < command < 0.3 --> Gripper is Idle
-        # 0.3 < command < 1 --> Gripper is Closing
+        # 夹爪行为如下：
+        # -1 < command < -0.3 --> 夹爪正在张开
+        # -0.3 < command < 0.3 --> 夹爪空闲
+        # 0.3 < command < 1 --> 夹爪正在闭合
         print(f"[INFO]: Gripper commands: {gripper_commands}")
         mapped_commands = [
             "Opening" if command < -0.3 else "Closing" if command > 0.3 else "Idle" for command in gripper_commands
         ]
         print(f"[INFO]: Mapped commands: {mapped_commands}")
-        # Set the gripper command
+        # 设置夹爪指令
         surface_gripper.set_grippers_command(gripper_commands)
-        # Write data to sim
+        # 将数据写入仿真
         surface_gripper.write_data_to_sim()
-        # Perform step
+        # 执行一步仿真
         sim.step()
-        # Increment counter
+        # 递增计数器
         count += 1
-        # Read the gripper state from the simulation
+        # 从仿真中读取夹爪状态
         surface_gripper.update(sim_dt)
-        # Read the gripper state from the buffer
+        # 从缓冲区中读取夹爪状态
         surface_gripper_state = surface_gripper.state
-        # The gripper state is a list of integers that can be mapped to the following:
-        # -1 --> Open
-        # 0 --> Closing
-        # 1 --> Closed
-        # Print the gripper state
+        # 夹爪状态是整数列表，可映射为以下含义：
+        # -1 --> 张开
+        # 0 --> 闭合中
+        # 1 --> 已闭合
+        # 打印夹爪状态
         print(f"[INFO]: Gripper state: {surface_gripper_state}")
         mapped_commands = [
             "Open" if state == -1 else "Closing" if state == 0 else "Closed" for state in surface_gripper_state.tolist()
@@ -158,24 +158,24 @@ def run_simulator(
 
 def main():
     """Main function."""
-    # Load kit helper
+    # 加载 Kit 辅助组件
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([2.75, 7.5, 10.0], [2.75, 0.0, 0.0])
-    # Design scene
+    # 构建场景
     scene_entities, scene_origins = design_scene()
     scene_origins = torch.tensor(scene_origins, device=sim.device)
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run the simulator
+    # 运行模拟器
     run_simulator(sim, scene_entities, scene_origins)
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

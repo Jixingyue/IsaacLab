@@ -19,14 +19,14 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 创建参数解析器
 parser = argparse.ArgumentParser(
     description="This script checks the FrameTransformer sensor by visualizing the frames that it creates."
 )
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(headless=args_cli.headless)
 simulation_app = app_launcher.app
 
@@ -47,18 +47,18 @@ from isaaclab.sensors import FrameTransformer, FrameTransformerCfg, OffsetCfg
 from isaaclab.sim import SimulationContext
 
 ##
-# Pre-defined configs
+# 预定义配置
 ##
 from isaaclab_assets.robots.anymal import ANYMAL_C_CFG  # isort:skip
 
 
 def define_sensor() -> FrameTransformer:
     """Defines the FrameTransformer sensor to add to the scene."""
-    # define offset
+    # 定义偏移
     rot_offset = math_utils.quat_from_euler_xyz(torch.zeros(1), torch.zeros(1), torch.tensor(-math.pi / 2))
     pos_offset = math_utils.quat_apply(rot_offset, torch.tensor([0.08795, 0.01305, -0.33797]))
 
-    # Example using .* to get full body + LF_FOOT
+    # 使用 .* 获取全身 + LF_FOOT 的示例
     frame_transformer_cfg = FrameTransformerCfg(
         prim_path="/World/Robot/base",
         target_frames=[
@@ -78,85 +78,84 @@ def define_sensor() -> FrameTransformer:
 
 def design_scene() -> dict:
     """Design the scene."""
-    # Populate scene
-    # -- Ground-plane
+    # 构建场景
+    # -- 地面平面
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
-    # -- Lights
+    # -- 光照
     cfg = sim_utils.DistantLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     cfg.func("/World/Light", cfg)
-    # -- Robot
+    # -- 机器人
     robot = Articulation(ANYMAL_C_CFG.replace(prim_path="/World/Robot"))
-    # -- Sensors
+    # -- 传感器
     frame_transformer = define_sensor()
 
-    # return the scene information
+    # 返回场景信息
     scene_entities = {"robot": robot, "frame_transformer": frame_transformer}
     return scene_entities
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
     """Run the simulator."""
-    # Define simulation stepping
+    # 定义仿真步进参数
     sim_dt = sim.get_physics_dt()
     sim_time = 0.0
     count = 0
 
-    # extract entities for simplified notation
+    # 提取实体以简化表示
     robot: Articulation = scene_entities["robot"]
     frame_transformer: FrameTransformer = scene_entities["frame_transformer"]
 
-    # We only want one visualization at a time. This visualizer will be used
-    # to step through each frame so the user can verify that the correct frame
-    # is being visualized as the frame names are printing to console
+    # 我们一次只需要一个可视化。此可视化器将逐步遍历每个坐标系，
+    # 以便用户可以验证在控制台打印坐标系名称时是否正确可视化了相应坐标系
     if not args_cli.headless:
         cfg = FRAME_MARKER_CFG.replace(prim_path="/Visuals/FrameVisualizerFromScript")
         cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
         transform_visualizer = VisualizationMarkers(cfg)
-        # debug drawing for lines connecting the frame
+        # 用于绘制连接坐标系连线的调试绘制接口
         draw_interface = omni_debug_draw.acquire_debug_draw_interface()
     else:
         transform_visualizer = None
         draw_interface = None
 
     frame_index = 0
-    # Simulate physics
+    # 仿真物理
     while simulation_app.is_running():
-        # perform this loop at policy control freq (50 Hz)
+        # 按策略控制频率（50 Hz）执行此循环
         robot.set_joint_position_target(robot.data.default_joint_pos.clone())
         robot.write_data_to_sim()
-        # perform step
+        # 执行一步仿真
         sim.step()
-        # update sim-time
+        # 更新仿真时间
         sim_time += sim_dt
         count += 1
-        # read data from sim
+        # 从仿真中读取数据
         robot.update(sim_dt)
         frame_transformer.update(dt=sim_dt)
 
-        # Change the frame that we are visualizing to ensure that frame names
-        # are correctly associated with the frames
+        # 更改当前可视化的坐标系，以确保坐标系名称
+        # 与坐标系正确关联
         if not args_cli.headless:
             if count % 50 == 0:
-                # get frame names
+                # 获取坐标系名称
                 frame_names = frame_transformer.data.target_frame_names
-                # increment frame index
+                # 递增坐标系索引
                 frame_index += 1
                 frame_index = frame_index % len(frame_names)
                 print(f"Displaying Frame ID {frame_index}: {frame_names[frame_index]}")
 
-            # visualize frame
+            # 可视化坐标系
             source_pos = frame_transformer.data.source_pos_w
             source_quat = frame_transformer.data.source_quat_w
             target_pos = frame_transformer.data.target_pos_w[:, frame_index]
             target_quat = frame_transformer.data.target_quat_w[:, frame_index]
-            # draw the frames
+            # 绘制坐标系
             transform_visualizer.visualize(
                 torch.cat([source_pos, target_pos], dim=0), torch.cat([source_quat, target_quat], dim=0)
             )
-            # draw the line connecting the frames
+            # 绘制连接坐标系的连线
             draw_interface.clear_lines()
-            # plain color for lines
+            # 连线的统一颜色
             lines_colors = [[1.0, 1.0, 0.0, 1.0]] * source_pos.shape[0]
             line_thicknesses = [5.0] * source_pos.shape[0]
             draw_interface.draw_lines(source_pos.tolist(), target_pos.tolist(), lines_colors, line_thicknesses)
@@ -164,23 +163,23 @@ def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
 
 def main():
     """Main function."""
-    # Load kit helper
+    # 加载 Kit 辅助组件
     sim_cfg = sim_utils.SimulationCfg(dt=0.005, device=args_cli.device)
     sim = SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view(eye=[2.5, 2.5, 2.5], target=[0.0, 0.0, 0.0])
-    # Design scene
+    # 构建场景
     scene_entities = design_scene()
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run the simulator
+    # 运行模拟器
     run_simulator(sim, scene_entities)
 
 
 if __name__ == "__main__":
-    # Run the main function
+    # 运行主函数
     main()
-    # Close the simulator
+    # 关闭仿真应用
     simulation_app.close()

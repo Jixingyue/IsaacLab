@@ -22,13 +22,13 @@ import os
 
 from isaaclab.app import AppLauncher
 
-# create argparser
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Tutorial on creating logs from within the docker container.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -39,46 +39,46 @@ from isaaclab.sim import SimulationCfg, SimulationContext
 
 def main():
     """Main function."""
-    # Specify that the logs must be in logs/docker_tutorial
+    # 指定日志必须写入 logs/docker_tutorial
     log_dir_path = os.path.join("logs")
     if not os.path.isdir(log_dir_path):
         os.mkdir(log_dir_path)
-    # In the container, the absolute path will be
-    # /workspace/isaaclab/logs/docker_tutorial, because
-    # all python execution is done through /workspace/isaaclab/isaaclab.sh
-    # and the calling process' path will be /workspace/isaaclab
+    # 在容器中，绝对路径将会是
+    # /workspace/isaaclab/logs/docker_tutorial，因为
+    # 所有 Python 执行都通过 /workspace/isaaclab/isaaclab.sh 完成
+    # 并且调用进程的路径会是 /workspace/isaaclab
     log_dir_path = os.path.abspath(os.path.join(log_dir_path, "docker_tutorial"))
     if not os.path.isdir(log_dir_path):
         os.mkdir(log_dir_path)
     print(f"[INFO] Logging experiment to directory: {log_dir_path}")
 
-    # Initialize the simulation context
+    # 初始化仿真上下文
     sim_cfg = SimulationCfg(dt=0.01)
     sim = SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
 
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
 
-    # Prepare to count sim_time
+    # 准备累计 sim_time
     sim_dt = sim.get_physics_dt()
     sim_time = 0.0
 
-    # Open logging file
+    # 打开日志文件
     with open(os.path.join(log_dir_path, "log.txt"), "w") as log_file:
-        # Simulate physics
+        # 运行物理仿真
         while simulation_app.is_running():
             log_file.write(f"{sim_time}" + "\n")
-            # perform step
+            # 执行一步仿真
             sim.step()
             sim_time += sim_dt
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

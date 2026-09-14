@@ -25,15 +25,15 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Tutorial on adding sensors on a robot.")
 parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -48,7 +48,7 @@ from isaaclab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, patterns
 from isaaclab.utils import configclass
 
 ##
-# Pre-defined configs
+# 预定义配置
 ##
 from isaaclab_assets.robots.anymal import ANYMAL_C_CFG  # isort: skip
 
@@ -57,18 +57,18 @@ from isaaclab_assets.robots.anymal import ANYMAL_C_CFG  # isort: skip
 class SensorsSceneCfg(InteractiveSceneCfg):
     """Design the scene with sensors on the robot."""
 
-    # ground plane
+    # 地面平面
     ground = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg())
 
-    # lights
+    # 光照
     dome_light = AssetBaseCfg(
         prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     )
 
-    # robot
+    # 机器人
     robot: ArticulationCfg = ANYMAL_C_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    # sensors
+    # 传感器
     camera = CameraCfg(
         prim_path="{ENV_REGEX_NS}/Robot/base/front_cam",
         update_period=0.1,
@@ -96,51 +96,51 @@ class SensorsSceneCfg(InteractiveSceneCfg):
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     """Run the simulator."""
-    # Define simulation stepping
+    # 定义仿真步进参数
     sim_dt = sim.get_physics_dt()
     sim_time = 0.0
     count = 0
 
-    # Simulate physics
+    # 仿真物理
     while simulation_app.is_running():
-        # Reset
+        # 重置
         if count % 500 == 0:
-            # reset counter
+            # 重置计数器
             count = 0
-            # reset the scene entities
-            # root state
-            # we offset the root state by the origin since the states are written in simulation world frame
-            # if this is not done, then the robots will be spawned at the (0, 0, 0) of the simulation world
+            # 重置场景实体
+            # 根状态
+            # 由于状态是以仿真世界坐标系写入的，因此我们要按原点对根状态进行偏移
+            # 否则机器人会生成在仿真世界的 (0, 0, 0) 位置
             root_state = scene["robot"].data.default_root_state.clone()
             root_state[:, :3] += scene.env_origins
             scene["robot"].write_root_pose_to_sim(root_state[:, :7])
             scene["robot"].write_root_velocity_to_sim(root_state[:, 7:])
-            # set joint positions with some noise
+            # 为关节位置添加一些噪声
             joint_pos, joint_vel = (
                 scene["robot"].data.default_joint_pos.clone(),
                 scene["robot"].data.default_joint_vel.clone(),
             )
             joint_pos += torch.rand_like(joint_pos) * 0.1
             scene["robot"].write_joint_state_to_sim(joint_pos, joint_vel)
-            # clear internal buffers
+            # 清空内部缓冲区
             scene.reset()
             print("[INFO]: Resetting robot state...")
-        # Apply default actions to the robot
-        # -- generate actions/commands
+        # 对机器人施加默认动作
+        # -- 生成动作/指令
         targets = scene["robot"].data.default_joint_pos
-        # -- apply action to the robot
+        # -- 将动作施加到机器人
         scene["robot"].set_joint_position_target(targets)
-        # -- write data to sim
+        # -- 将数据写入仿真
         scene.write_data_to_sim()
-        # perform step
+        # 执行一步仿真
         sim.step()
-        # update sim-time
+        # 更新仿真时间
         sim_time += sim_dt
         count += 1
-        # update buffers
+        # 更新缓冲区
         scene.update(sim_dt)
 
-        # print information from the sensors
+        # 打印传感器信息
         print("-------------------------------")
         print(scene["camera"])
         print("Received shape of rgb   image: ", scene["camera"].data.output["rgb"].shape)
@@ -156,24 +156,24 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 def main():
     """Main function."""
 
-    # Initialize the simulation context
+    # 初始化仿真上下文
     sim_cfg = sim_utils.SimulationCfg(dt=0.005, device=args_cli.device)
     sim = sim_utils.SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view(eye=[3.5, 3.5, 3.5], target=[0.0, 0.0, 0.0])
-    # Design scene
+    # 构建场景
     scene_cfg = SensorsSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
     scene = InteractiveScene(scene_cfg)
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run the simulator
+    # 运行模拟器
     run_simulator(sim, scene)
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

@@ -19,13 +19,13 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Ray Caster Test Script")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -42,7 +42,7 @@ from isaaclab.utils.timer import Timer
 
 def define_sensor() -> RayCaster:
     """Defines the ray-caster sensor to add to the scene."""
-    # Create a ray-caster sensor
+    # 创建射线投射传感器
     ray_caster_cfg = RayCasterCfg(
         prim_path="/World/Origin.*/ball",
         mesh_prim_paths=["/World/ground"],
@@ -57,20 +57,20 @@ def define_sensor() -> RayCaster:
 
 def design_scene() -> dict:
     """Design the scene."""
-    # Populate scene
-    # -- Rough terrain
+    # 构建场景
+    # -- 粗糙地形
     cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Environments/Terrains/rough_plane.usd")
     cfg.func("/World/ground", cfg)
-    # -- Light
+    # -- 光照
     cfg = sim_utils.DistantLightCfg(intensity=2000)
     cfg.func("/World/light", cfg)
 
-    # Create separate groups called "Origin1", "Origin2", "Origin3"
-    # Each group will have a robot in it
+    # 创建名为 "Origin0"、"Origin1"、"Origin2"、"Origin3" 的独立分组
+    # 每个分组中都会放置一个物体
     origins = [[0.25, 0.25, 0.0], [-0.25, 0.25, 0.0], [0.25, -0.25, 0.0], [-0.25, -0.25, 0.0]]
     for i, origin in enumerate(origins):
         sim_utils.create_prim(f"/World/Origin{i}", "Xform", translation=origin)
-    # -- Balls
+    # -- 球体
     cfg = RigidObjectCfg(
         prim_path="/World/Origin.*/ball",
         spawn=sim_utils.SphereCfg(
@@ -82,68 +82,68 @@ def design_scene() -> dict:
         ),
     )
     balls = RigidObject(cfg)
-    # -- Sensors
+    # -- 传感器
     ray_caster = define_sensor()
 
-    # return the scene information
+    # 返回场景信息
     scene_entities = {"balls": balls, "ray_caster": ray_caster}
     return scene_entities
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene_entities: dict):
     """Run the simulator."""
-    # Extract scene_entities for simplified notation
+    # 提取实体以简化表示
     ray_caster: RayCaster = scene_entities["ray_caster"]
     balls: RigidObject = scene_entities["balls"]
 
-    # define an initial position of the sensor
+    # 定义传感器的初始位置
     ball_default_state = balls.data.default_root_state.clone()
     ball_default_state[:, :3] = torch.rand_like(ball_default_state[:, :3]) * 10
 
-    # Create a counter for resetting the scene
+    # 创建用于重置场景的计数器
     step_count = 0
-    # Simulate physics
+    # 仿真物理
     while simulation_app.is_running():
-        # Reset the scene
+        # 重置场景
         if step_count % 250 == 0:
-            # reset the balls
+            # 重置球体
             balls.write_root_pose_to_sim(ball_default_state[:, :7])
             balls.write_root_velocity_to_sim(ball_default_state[:, 7:])
-            # reset the sensor
+            # 重置传感器
             ray_caster.reset()
-            # reset the counter
+            # 重置计数器
             step_count = 0
-        # Step simulation
+        # 执行一步仿真
         sim.step()
-        # Update the ray-caster
+        # 更新射线投射器
         with Timer(
             f"Ray-caster update with {4} x {ray_caster.num_rays} rays with max height of"
             f" {torch.max(ray_caster.data.pos_w).item():.2f}"
         ):
             ray_caster.update(dt=sim.get_physics_dt(), force_recompute=True)
-        # Update counter
+        # 更新计数器
         step_count += 1
 
 
 def main():
     """Main function."""
-    # Load simulation context
+    # 加载仿真上下文
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = sim_utils.SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view([0.0, 15.0, 15.0], [0.0, 0.0, -2.5])
-    # Design scene
+    # 构建场景
     scene_entities = design_scene()
-    # Play simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run simulator
+    # 运行模拟器
     run_simulator(sim=sim, scene_entities=scene_entities)
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

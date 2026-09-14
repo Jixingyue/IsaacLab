@@ -20,14 +20,14 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 添加 argparse 参数
 parser = argparse.ArgumentParser(description="Tutorial on spawning and interacting with a rigid object.")
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -43,20 +43,20 @@ from isaaclab.sim import SimulationContext
 
 def design_scene():
     """Designs the scene."""
-    # Ground-plane
+    # 地面平面
     cfg = sim_utils.GroundPlaneCfg()
     cfg.func("/World/defaultGroundPlane", cfg)
-    # Lights
+    # 光照
     cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.8, 0.8, 0.8))
     cfg.func("/World/Light", cfg)
 
-    # Create separate groups called "Origin1", "Origin2", "Origin3"
-    # Each group will have a robot in it
+    # 创建独立分组
+    # 每个分组中都会放置一个机器人
     origins = [[0.25, 0.25, 0.0], [-0.25, 0.25, 0.0], [0.25, -0.25, 0.0], [-0.25, -0.25, 0.0]]
     for i, origin in enumerate(origins):
         sim_utils.create_prim(f"/World/Origin{i}", "Xform", translation=origin)
 
-    # Rigid Object
+    # 刚体物体
     cone_cfg = RigidObjectCfg(
         prim_path="/World/Origin.*/Cone",
         spawn=sim_utils.ConeCfg(
@@ -71,76 +71,76 @@ def design_scene():
     )
     cone_object = RigidObject(cfg=cone_cfg)
 
-    # return the scene information
+    # 返回场景信息
     scene_entities = {"cone": cone_object}
     return scene_entities, origins
 
 
 def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, RigidObject], origins: torch.Tensor):
     """Runs the simulation loop."""
-    # Extract scene entities
-    # note: we only do this here for readability. In general, it is better to access the entities directly from
-    #   the dictionary. This dictionary is replaced by the InteractiveScene class in the next tutorial.
+    # 提取场景实体
+    # 注意：这里只是为了提高可读性。通常更推荐直接从字典中访问实体
+    #   在下一个教程中，这个字典会被 InteractiveScene 类替代
     cone_object = entities["cone"]
-    # Define simulation stepping
+    # 定义仿真步进参数
     sim_dt = sim.get_physics_dt()
     sim_time = 0.0
     count = 0
-    # Simulate physics
+    # 运行物理仿真
     while simulation_app.is_running():
-        # reset
+        # 重置
         if count % 250 == 0:
-            # reset counters
+            # 重置计数器
             sim_time = 0.0
             count = 0
-            # reset root state
+            # 重置根状态
             root_state = cone_object.data.default_root_state.clone()
-            # sample a random position on a cylinder around the origins
+            # 在原点周围的圆柱区域内随机采样位置
             root_state[:, :3] += origins
             root_state[:, :3] += math_utils.sample_cylinder(
                 radius=0.1, h_range=(0.25, 0.5), size=cone_object.num_instances, device=cone_object.device
             )
-            # write root state to simulation
+            # 将根状态写入仿真
             cone_object.write_root_pose_to_sim(root_state[:, :7])
             cone_object.write_root_velocity_to_sim(root_state[:, 7:])
-            # reset buffers
+            # 重置缓冲区
             cone_object.reset()
             print("----------------------------------------")
             print("[INFO]: Resetting object state...")
-        # apply sim data
+        # 写入仿真数据
         cone_object.write_data_to_sim()
-        # perform step
+        # 执行一步仿真
         sim.step()
-        # update sim-time
+        # 更新时间
         sim_time += sim_dt
         count += 1
-        # update buffers
+        # 更新缓冲区
         cone_object.update(sim_dt)
-        # print the root position
+        # 打印根位置
         if count % 50 == 0:
             print(f"Root position (in world): {cone_object.data.root_pos_w}")
 
 
 def main():
     """Main function."""
-    # Load kit helper
+    # 加载 Kit 辅助组件
     sim_cfg = sim_utils.SimulationCfg(device=args_cli.device)
     sim = SimulationContext(sim_cfg)
-    # Set main camera
+    # 设置主相机
     sim.set_camera_view(eye=[1.5, 0.0, 1.0], target=[0.0, 0.0, 0.0])
-    # Design scene
+    # 构建场景
     scene_entities, scene_origins = design_scene()
     scene_origins = torch.tensor(scene_origins, device=sim.device)
-    # Play the simulator
+    # 启动模拟器
     sim.reset()
-    # Now we are ready!
+    # 现在已准备就绪
     print("[INFO]: Setup complete...")
-    # Run the simulator
+    # 运行模拟器
     run_simulator(sim, scene_entities, scene_origins)
 
 
 if __name__ == "__main__":
-    # run the main function
+    # 运行主函数
     main()
-    # close sim app
+    # 关闭仿真应用
     simulation_app.close()

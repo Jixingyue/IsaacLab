@@ -23,16 +23,16 @@ import argparse
 
 from isaaclab.app import AppLauncher
 
-# add argparse arguments
+# 创建参数解析器
 parser = argparse.ArgumentParser(description="Tutorial on inferencing a policy on an H1 robot in a warehouse.")
 parser.add_argument("--checkpoint", type=str, help="Path to model checkpoint exported as jit.", required=True)
 
-# append AppLauncher cli args
+# 添加 AppLauncher 命令行参数
 AppLauncher.add_app_launcher_args(parser)
-# parse the arguments
+# 解析参数
 args_cli = parser.parse_args()
 
-# launch omniverse app
+# 启动 Omniverse 应用
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
@@ -53,13 +53,13 @@ from isaaclab_tasks.manager_based.locomotion.velocity.config.h1.rough_env_cfg im
 
 def main():
     """Main function."""
-    # load the trained jit policy
+    # 加载训练好的 JIT 策略
     policy_path = os.path.abspath(args_cli.checkpoint)
     file_content = omni.client.read_file(policy_path)[2]
     file = io.BytesIO(memoryview(file_content).tobytes())
     policy = torch.jit.load(file, map_location=args_cli.device)
 
-    # setup environment
+    # 搭建环境
     env_cfg = H1RoughEnvCfg_PLAY()
     env_cfg.scene.num_envs = 1
     env_cfg.curriculum = None
@@ -72,10 +72,10 @@ def main():
     if args_cli.device == "cpu":
         env_cfg.sim.use_fabric = False
 
-    # create environment
+    # 创建环境
     env = ManagerBasedRLEnv(cfg=env_cfg)
 
-    # run inference with the policy
+    # 使用策略进行推理
     obs, _ = env.reset()
     with torch.inference_mode():
         while simulation_app.is_running():
